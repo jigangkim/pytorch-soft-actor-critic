@@ -8,6 +8,9 @@ from sac import SAC
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
 
+import fetch_envs
+from utils import set_global_torch_determinism
+
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
 parser.add_argument('--env-name', default="HalfCheetah-v2",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
@@ -48,12 +51,17 @@ args = parser.parse_args()
 
 # Environment
 # env = NormalizedActions(gym.make(args.env_name))
-env = gym.make(args.env_name)
+if 'Fetch' in args.env_name:
+    from fetch_envs import NonGoalEnvWrapper
+    env = NonGoalEnvWrapper(gym.make(args.env_name))
+else:
+    env = gym.make(args.env_name)
 env.seed(args.seed)
 env.action_space.seed(args.seed)
 
-torch.manual_seed(args.seed)
-np.random.seed(args.seed)
+# torch.manual_seed(args.seed)
+# np.random.seed(args.seed)
+set_global_torch_determinism(args.seed, fast_n_close=False)
 
 # Agent
 agent = SAC(env.observation_space.shape[0], env.action_space, args)
@@ -115,6 +123,7 @@ for i_episode in itertools.count(1):
 
     if i_episode % 10 == 0 and args.eval is True:
         avg_reward = 0.
+        success_rate = 0.
         episodes = 10
         for _  in range(episodes):
             state = env.reset()
@@ -123,16 +132,19 @@ for i_episode in itertools.count(1):
             while not done:
                 action = agent.select_action(state, evaluate=True)
 
-                next_state, reward, done, _ = env.step(action)
+                next_state, reward, done, info = env.step(action)
                 episode_reward += reward
 
 
                 state = next_state
             avg_reward += episode_reward
+            success_rate += info['is_success']
         avg_reward /= episodes
+        success_rate /= episodes
 
 
         writer.add_scalar('avg_reward/test', avg_reward, i_episode)
+        writer.add_scalar('success_rate/test', success_rate, i_episode)
 
         print("----------------------------------------")
         print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
