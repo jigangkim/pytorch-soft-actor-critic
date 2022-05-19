@@ -167,7 +167,7 @@ def main(
 
                     state = next_state
                 avg_reward += episode_reward
-                success_rate += info['is_success']
+                success_rate += info.get('is_success', -1.) # -1 if is_success key is not present
             avg_reward /= episodes
             success_rate /= episodes
 
