@@ -170,14 +170,25 @@ class NonGoalEnvWrapper(ObservationWrapper):
         super().__init__(env)
         
         obs_space, goal_space = self.env.observation_space['observation'], self.env.observation_space['desired_goal']
-        low = np.concatenate([obs_space.low, goal_space.low])
-        high = np.concatenate([obs_space.high, goal_space.high])
+        low = np.concatenate([obs_space.low, goal_space.low, goal_space.low])
+        high = np.concatenate([obs_space.high, goal_space.high, goal_space.high])
         self.observation_space = gym.spaces.Box(low, high)
+
+        self._obs_dim = obs_space.shape[0]
+        self._goal_dim = goal_space.shape[0]
 
         self._max_episode_steps = self.env._max_episode_steps
 
     def observation(self, observation):
-        return np.concatenate([observation['observation'], observation['desired_goal']])
+        # achieved goal is redundant but it is needed for HER (compute_reward)
+        return np.concatenate([observation['observation'], observation['achieved_goal'], observation['desired_goal']])
+
+    def get_obs_dict(self, obs):
+        return {
+            'observation': obs[:self._obs_dim],
+            'achieved_goal': obs[self._obs_dim:self._obs_dim+self._goal_dim],
+            'desired_goal': obs[self._obs_dim+self._goal_dim:],
+        }
 
 
 for reward_type, goal_dist in list(itertools.product(["sparse", "dense"], ["uniform", "compact", "single"])):

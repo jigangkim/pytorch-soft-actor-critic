@@ -10,7 +10,7 @@ import itertools
 import torch
 from sac import SAC
 from torch.utils.tensorboard import SummaryWriter
-from replay_memory import ReplayMemory
+from replay_memory import ReplayMemory, HindsightReplayMemory
 
 import fetch_envs # required to register envs for gym.make beforehand
 from utils import set_global_torch_determinism
@@ -34,6 +34,9 @@ def main(
     replay_size,
     cuda,
     use_value_function,
+    use_her,
+    n_sampled_goal,
+    goal_selection_strategy,
     log_basedir='./runs'
     ):
     # Environment
@@ -102,7 +105,10 @@ def main(
     main_logger.info(f'Logging to {tensorboard_dir}')
 
     # Memory
-    memory = ReplayMemory(replay_size, seed)
+    if use_her:
+        memory = HindsightReplayMemory(replay_size, seed, env, n_sampled_goal, goal_selection_strategy)
+    else:
+        memory = ReplayMemory(replay_size, seed)
 
     # Training Loop
     total_numsteps = 0
@@ -134,7 +140,7 @@ def main(
                     writer.add_scalar('entropy_temprature/alpha', alpha, updates)
                     updates += 1
 
-            next_state, reward, done, _ = env.step(action) # Step
+            next_state, reward, done, info_dict = env.step(action) # Step
             episode_steps += 1
             total_numsteps += 1
             episode_reward += reward
@@ -143,7 +149,7 @@ def main(
             # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
             mask = 1 if episode_steps == env._max_episode_steps else float(not done)
 
-            memory.push(state, action, reward, next_state, mask) # Append transition to memory
+            memory.push(state, action, reward, next_state, mask, i_episode, info_dict) # Append transition to memory
 
             state = next_state
 
@@ -223,6 +229,12 @@ if __name__ == '__main__':
                         help='run on CUDA (default: False)')
     parser.add_argument('--use_value_function', action="store_true",
                         help='run value function variant SAC-V (default: False)')
+    parser.add_argument('--use_her', action="store_true",
+                        help='train with HER (default: False)')
+    parser.add_argument('--n_sampled_goal', type=int, default=4, metavar='N',
+                        help='ratio of HER resampled transitions (default: 4)')
+    parser.add_argument('--goal_selection_strategy', default="future",
+                        help='HER goal resampling strategy (default: future)')
     args = parser.parse_args()
 
     main(
@@ -243,5 +255,8 @@ if __name__ == '__main__':
         target_update_interval=args.target_update_interval,
         replay_size=args.replay_size,
         cuda=args.cuda,
-        use_value_function=args.use_value_function
+        use_value_function=args.use_value_function,
+        use_her=args.use_her,
+        n_sampled_goal=args.n_sampled_goal,
+        goal_selection_strategy=args.goal_selection_strategy
     )

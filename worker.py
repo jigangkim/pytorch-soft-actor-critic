@@ -41,6 +41,9 @@ class SACWorker(NVGPUWorker):
             replay_size=1000000,
             cuda=False,
             use_value_function=False,
+            use_her=False,
+            n_sampled_goal=4,
+            goal_selection_strategy='future',
             ):
 
             # log_tqdm
@@ -66,6 +69,9 @@ class SACWorker(NVGPUWorker):
                 replay_size=replay_size,
                 cuda=cuda,
                 use_value_function=use_value_function,
+                use_her=use_her,
+                n_sampled_goal=n_sampled_goal,
+                goal_selection_strategy=goal_selection_strategy,
                 log_basedir=SACWorker.log_basedir,
             )
 
