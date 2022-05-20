@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 from utils import soft_update, hard_update
-from model import GaussianPolicy, QNetwork, DeterministicPolicy
+from model import GaussianPolicy, QNetwork, DeterministicPolicy, BetaPolicy
 
 
 class SAC(object):
@@ -47,11 +47,24 @@ class SAC(object):
             self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr)
 
-        else:
+        elif self.policy_type == "Deterministic":
             self.alpha = 0
             self.automatic_entropy_tuning = False
             self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+
+        elif self.policy_type == "Beta":
+            # Target Entropy = −dim(A) (e.g. , -6 for HalfCheetah-v2) as given in the paper
+            if self.automatic_entropy_tuning is True:
+                self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
+                self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+                self.alpha_optim = Adam([self.log_alpha], lr=lr)
+
+            self.policy = BetaPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
+            self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+
+        else:
+            raise ValueError('Invalid policy type %s'%(self.policy_type))
 
     def select_action(self, state, evaluate=False):
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)

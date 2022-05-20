@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import Normal, Beta
 
 LOG_SIG_MAX = 2
 LOG_SIG_MIN = -20
+LOG_ALPHABETA_MAX = 10
+LOG_ALPHABETA_MIN = -10
 epsilon = 1e-6
 
 # Initialize Policy weights
@@ -60,6 +62,54 @@ class QNetwork(nn.Module):
 
         return x1, x2
 
+
+class BetaPolicy(nn.Module):
+    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
+        super(BetaPolicy, self).__init__()
+        
+        self.linear1 = nn.Linear(num_inputs, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+
+        self.log_alpha_linear = nn.Linear(hidden_dim, num_actions)
+        self.log_beta_linear = nn.Linear(hidden_dim, num_actions)
+
+        self.apply(weights_init_)
+
+        # action rescaling
+        if action_space is None:
+            self.action_scale = torch.tensor(2.)
+            self.action_bias = torch.tensor(-1.)
+        else:
+            self.action_scale = torch.FloatTensor(
+                (action_space.high - action_space.low) )
+            self.action_bias = torch.FloatTensor(action_space.low)
+
+    def forward(self, state):
+        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear2(x))
+        log_alpha = self.log_alpha_linear(x)
+        log_beta = self.log_beta_linear(x)
+        log_alpha = torch.clamp(log_alpha, min=LOG_ALPHABETA_MIN, max=LOG_ALPHABETA_MAX)
+        log_beta = torch.clamp(log_beta, min=LOG_ALPHABETA_MIN, max=LOG_ALPHABETA_MAX)
+        return log_alpha, log_beta
+
+    def sample(self, state):
+        log_alpha, log_beta = self.forward(state)
+        alpha = log_alpha.exp() + 1.
+        beta = log_beta.exp() + 1.
+        beta = Beta(alpha, beta)
+        x_t = beta.rsample()  # for reparameterization trick (mean + std * N(0,1))
+        action = x_t * self.action_scale + self.action_bias
+        log_prob = beta.log_prob(x_t)
+        log_prob = log_prob.sum(1, keepdim=True)
+        mean = beta.mean * self.action_scale + self.action_bias
+        return action, log_prob, mean
+
+    def to(self, device):
+        self.action_scale = self.action_scale.to(device)
+        self.action_bias = self.action_bias.to(device)
+        return super(BetaPolicy, self).to(device)
+        
 
 class GaussianPolicy(nn.Module):
     def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
