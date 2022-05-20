@@ -39,7 +39,8 @@ class SACWorker(NVGPUWorker):
             start_steps=10000,
             target_update_interval=1,
             replay_size=1000000,
-            cuda=False
+            cuda=False,
+            use_value_function=False,
             ):
 
             # log_tqdm
@@ -64,6 +65,7 @@ class SACWorker(NVGPUWorker):
                 target_update_interval=target_update_interval,
                 replay_size=replay_size,
                 cuda=cuda,
+                use_value_function=use_value_function,
                 log_basedir=SACWorker.log_basedir,
             )
 

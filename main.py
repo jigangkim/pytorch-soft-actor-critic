@@ -33,6 +33,7 @@ def main(
     target_update_interval,
     replay_size,
     cuda,
+    use_value_function,
     log_basedir='./runs'
     ):
     # Environment
@@ -61,7 +62,8 @@ def main(
         automatic_entropy_tuning,
         hidden_size,
         target_update_interval,
-        cuda
+        cuda,
+        use_value_function
     )
 
     #Tesnorboard
@@ -122,8 +124,9 @@ def main(
                 # Number of updates per step in environment
                 for i in range(updates_per_step):
                     # Update parameters of all the networks
-                    critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, batch_size, updates)
+                    value_loss, critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, batch_size, updates)
 
+                    writer.add_scalar('loss/value', value_loss, updates)
                     writer.add_scalar('loss/critic_1', critic_1_loss, updates)
                     writer.add_scalar('loss/critic_2', critic_2_loss, updates)
                     writer.add_scalar('loss/policy', policy_loss, updates)
@@ -218,6 +221,8 @@ if __name__ == '__main__':
                         help='size of replay buffer (default: 10000000)')
     parser.add_argument('--cuda', action="store_true",
                         help='run on CUDA (default: False)')
+    parser.add_argument('--use_value_function', action="store_true",
+                        help='run value function variant SAC-V (default: False)')
     args = parser.parse_args()
 
     main(
@@ -237,5 +242,6 @@ if __name__ == '__main__':
         start_steps=args.start_steps,
         target_update_interval=args.target_update_interval,
         replay_size=args.replay_size,
-        cuda=args.cuda
+        cuda=args.cuda,
+        use_value_function=args.use_value_function
     )

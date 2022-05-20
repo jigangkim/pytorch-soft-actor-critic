@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 from utils import soft_update, hard_update
-from model import GaussianPolicy, QNetwork, DeterministicPolicy, BetaPolicy
+from model import GaussianPolicy, QNetwork, ValueNetwork, DeterministicPolicy, BetaPolicy
 
 
 class SAC(object):
@@ -18,7 +18,8 @@ class SAC(object):
         automatic_entropy_tuning,
         hidden_size,
         target_update_interval,
-        cuda
+        cuda,
+        use_value_function
         ):
 
         self.gamma = gamma
@@ -31,11 +32,19 @@ class SAC(object):
 
         self.device = torch.device("cuda" if cuda else "cpu")
 
+        self.use_value_function = use_value_function
+
         self.critic = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(device=self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=lr)
 
-        self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
-        hard_update(self.critic_target, self.critic)
+        if self.use_value_function:
+            self.value = ValueNetwork(num_inputs, hidden_size).to(self.device)
+            self.value_target = ValueNetwork(num_inputs, hidden_size).to(self.device)
+            self.value_optim = Adam(self.value.parameters(), lr=lr)
+            hard_update(self.value_target, self.value)
+        else:
+            self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
+            hard_update(self.critic_target, self.critic)
 
         if self.policy_type == "Gaussian":
             # Target Entropy = −dim(A) (e.g. , -6 for HalfCheetah-v2) as given in the paper
@@ -85,10 +94,14 @@ class SAC(object):
         mask_batch = torch.FloatTensor(mask_batch).to(self.device).unsqueeze(1)
 
         with torch.no_grad():
-            next_state_action, next_state_log_pi, _ = self.policy.sample(next_state_batch)
-            qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
-            next_q_value = reward_batch + mask_batch * self.gamma * (min_qf_next_target)
+            if self.use_value_function:
+                vf_next_target = self.value_target(next_state_batch)
+                next_q_value = reward_batch + mask_batch * self.gamma * (vf_next_target)
+            else:
+                next_state_action, next_state_log_pi, _ = self.policy.sample(next_state_batch)
+                qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
+                min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
+                next_q_value = reward_batch + mask_batch * self.gamma * (min_qf_next_target)
         qf1, qf2 = self.critic(state_batch, action_batch)  # Two Q-functions to mitigate positive bias in the policy improvement step
         qf1_loss = F.mse_loss(qf1, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
         qf2_loss = F.mse_loss(qf2, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
@@ -109,6 +122,18 @@ class SAC(object):
         policy_loss.backward()
         self.policy_optim.step()
 
+        if self.use_value_function:
+            with torch.no_grad():
+                vf_target = min_qf_pi - (self.alpha * log_pi)
+            vf = self.value(state_batch)
+            vf_loss = F.mse_loss(vf, vf_target) # JV = 𝔼(st)~D[0.5(V(st) - (𝔼at~π[Q(st,at) - α * logπ(at|st)]))^2]
+
+            self.value_optim.zero_grad()
+            vf_loss.backward()
+            self.value_optim.step()
+        else:
+            vf_loss = torch.tensor(0.).to(self.device)
+
         if self.automatic_entropy_tuning:
             alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
 
@@ -124,9 +149,12 @@ class SAC(object):
 
 
         if updates % self.target_update_interval == 0:
-            soft_update(self.critic_target, self.critic, self.tau)
+            if self.use_value_function:
+                soft_update(self.value_target, self.value, self.tau)
+            else:
+                soft_update(self.critic_target, self.critic, self.tau)
 
-        return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
+        return vf_loss.item(), qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
 
     # Save model parameters
     def save_checkpoint(self, env_name, suffix="", ckpt_path=None):
@@ -135,11 +163,20 @@ class SAC(object):
         if ckpt_path is None:
             ckpt_path = "checkpoints/sac_checkpoint_{}_{}".format(env_name, suffix)
         print('Saving models to {}'.format(ckpt_path))
-        torch.save({'policy_state_dict': self.policy.state_dict(),
-                    'critic_state_dict': self.critic.state_dict(),
-                    'critic_target_state_dict': self.critic_target.state_dict(),
-                    'critic_optimizer_state_dict': self.critic_optim.state_dict(),
-                    'policy_optimizer_state_dict': self.policy_optim.state_dict()}, ckpt_path)
+        if self.use_value_function:
+            torch.save({'policy_state_dict': self.policy.state_dict(),
+                        'critic_state_dict': self.critic.state_dict(),
+                        'value_state_dict': self.value.state_dict(),
+                        'value_target_state_dict': self.value_target.state_dict(),
+                        'critic_optimizer_state_dict': self.critic_optim.state_dict(),
+                        'value_optimizer_state_dict': self.value_optim.state_dict(),
+                        'policy_optimizer_state_dict': self.policy_optim.state_dict()}, ckpt_path)
+        else:
+            torch.save({'policy_state_dict': self.policy.state_dict(),
+                        'critic_state_dict': self.critic.state_dict(),
+                        'critic_target_state_dict': self.critic_target.state_dict(),
+                        'critic_optimizer_state_dict': self.critic_optim.state_dict(),
+                        'policy_optimizer_state_dict': self.policy_optim.state_dict()}, ckpt_path)
 
     # Load model parameters
     def load_checkpoint(self, ckpt_path, evaluate=False):
@@ -148,16 +185,29 @@ class SAC(object):
             checkpoint = torch.load(ckpt_path)
             self.policy.load_state_dict(checkpoint['policy_state_dict'])
             self.critic.load_state_dict(checkpoint['critic_state_dict'])
-            self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
+            if self.use_value_function:
+                self.value.load_state_dict(checkpoint['value_state_dict'])
+                self.value_target.load_state_dict(checkpoint['value_target_state_dict'])
+                self.value_optim.load_state_dict(checkpoint['value_optimizer_state_dict'])
+            else:
+                self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
             self.critic_optim.load_state_dict(checkpoint['critic_optimizer_state_dict'])
             self.policy_optim.load_state_dict(checkpoint['policy_optimizer_state_dict'])
 
             if evaluate:
                 self.policy.eval()
                 self.critic.eval()
-                self.critic_target.eval()
+                if self.use_value_function:
+                    self.value.eval()
+                    self.value_target.eval()
+                else:
+                    self.critic_target.eval()
             else:
                 self.policy.train()
                 self.critic.train()
-                self.critic_target.train()
+                if self.use_value_function:
+                    self.value.train()
+                    self.value_target.train()
+                else:
+                    self.critic_target.train()
 
