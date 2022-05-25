@@ -8,12 +8,18 @@ import os
 import sys
 import itertools
 import torch
+from tqdm import tqdm
 from sac import SAC
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory, HindsightReplayMemory
 
 import fetch_envs # required to register envs for gym.make beforehand
 from utils import set_global_torch_determinism
+
+try:
+    from nvidia_gpu_scheduler.utils import log_tqdm
+except:
+    pass
 
 def main(
     env_name,
@@ -39,7 +45,8 @@ def main(
     goal_selection_strategy,
     num_hidden,
     eps,
-    log_basedir='./runs'
+    log_basedir='./runs',
+    config_path=None
     ):
     # Environment
     # env = NormalizedActions(gym.make(env_name))
@@ -87,6 +94,7 @@ def main(
     logger = logging.getLogger()
     logger.setLevel(logging.WARN) # set to default level WARN (otherwise it will log messages from imported modules)
     sh = logging.StreamHandler()
+    sh.setStream(tqdm)
     sh.setLevel(logging.INFO)
     fh = logging.FileHandler(os.path.join(tensorboard_dir, 'log.log'))
     fh.setLevel(logging.INFO)
@@ -118,6 +126,7 @@ def main(
     total_numsteps = 0
     updates = 0
 
+    pbar = tqdm(total=num_steps)
     for i_episode in itertools.count(1):
         episode_reward = 0
         episode_steps = 0
@@ -156,6 +165,10 @@ def main(
             memory.push(state, action, reward, next_state, mask, i_episode, info_dict) # Append transition to memory
 
             state = next_state
+        
+        if config_path is not None:
+            pbar.update(n=total_numsteps-pbar.n)
+            log_tqdm(pbar, config_path.replace('/', '_'))
 
         if total_numsteps > num_steps:
             break
@@ -192,6 +205,9 @@ def main(
             main_logger.info("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
             main_logger.info("----------------------------------------")
 
+    if config_path is not None:
+        log_tqdm(pbar, config_path.replace('/', '_'), remove=True)
+    pbar.close()
     env.close()
 
 if __name__ == '__main__':

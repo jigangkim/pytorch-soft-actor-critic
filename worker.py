@@ -77,6 +77,7 @@ class SACWorker(NVGPUWorker):
                 num_hidden=num_hidden,
                 eps=eps,
                 log_basedir=SACWorker.log_basedir,
+                config_path=config_path,
             )
 
         tmp_gin_file = '/tmp/%s'%(config_path.replace('/','_'))
