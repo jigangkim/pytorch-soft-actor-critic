@@ -20,6 +20,7 @@ class SAC(object):
         target_update_interval,
         cuda,
         use_value_function,
+        num_hidden,
         eps=1e-8,
         ):
 
@@ -37,16 +38,16 @@ class SAC(object):
 
         self.use_value_function = use_value_function
 
-        self.critic = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(device=self.device)
+        self.critic = QNetwork(num_inputs, action_space.shape[0], hidden_size, num_hidden).to(device=self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=lr, eps=eps)
 
         if self.use_value_function:
-            self.value = ValueNetwork(num_inputs, hidden_size).to(self.device)
-            self.value_target = ValueNetwork(num_inputs, hidden_size).to(self.device)
+            self.value = ValueNetwork(num_inputs, hidden_size, num_hidden).to(self.device)
+            self.value_target = ValueNetwork(num_inputs, hidden_size, num_hidden).to(self.device)
             self.value_optim = Adam(self.value.parameters(), lr=lr, eps=eps)
             hard_update(self.value_target, self.value)
         else:
-            self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
+            self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size, num_hidden).to(self.device)
             hard_update(self.critic_target, self.critic)
 
         if self.policy_type == "Gaussian":
@@ -56,13 +57,13 @@ class SAC(object):
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
                 self.alpha_optim = Adam([self.log_alpha], lr=lr, eps=eps)
 
-            self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
+            self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space, num_hidden).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         elif self.policy_type == "Deterministic":
             self.alpha = 0
             self.automatic_entropy_tuning = False
-            self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
+            self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], hidden_size, action_space, num_hidden).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         elif self.policy_type == "Beta":
@@ -72,7 +73,7 @@ class SAC(object):
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
                 self.alpha_optim = Adam([self.log_alpha], lr=lr, eps=eps)
 
-            self.policy = BetaPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
+            self.policy = BetaPolicy(num_inputs, action_space.shape[0], hidden_size, action_space, num_hidden).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         else:

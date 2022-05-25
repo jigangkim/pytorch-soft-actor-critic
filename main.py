@@ -37,6 +37,8 @@ def main(
     use_her,
     n_sampled_goal,
     goal_selection_strategy,
+    num_hidden,
+    eps,
     log_basedir='./runs'
     ):
     # Environment
@@ -66,7 +68,9 @@ def main(
         hidden_size,
         target_update_interval,
         cuda,
-        use_value_function
+        use_value_function,
+        num_hidden,
+        eps
     )
 
     #Tesnorboard
@@ -235,6 +239,10 @@ if __name__ == '__main__':
                         help='ratio of HER resampled transitions (default: 4)')
     parser.add_argument('--goal_selection_strategy', default="future",
                         help='HER goal resampling strategy (default: future)')
+    parser.add_argument('--num_hidden', type=int, default=2, metavar='N',
+                        help='HER goal resampling strategy (default: future)')
+    parser.add_argument('--eps', type=float, default=1e-8, metavar='G',
+                        help='HER goal resampling strategy (default: future)')
     args = parser.parse_args()
 
     main(
@@ -258,5 +266,7 @@ if __name__ == '__main__':
         use_value_function=args.use_value_function,
         use_her=args.use_her,
         n_sampled_goal=args.n_sampled_goal,
-        goal_selection_strategy=args.goal_selection_strategy
+        goal_selection_strategy=args.goal_selection_strategy,
+        num_hidden=args.num_hidden,
+        eps=args.eps
     )

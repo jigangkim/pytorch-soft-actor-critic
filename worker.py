@@ -44,6 +44,8 @@ class SACWorker(NVGPUWorker):
             use_her=False,
             n_sampled_goal=4,
             goal_selection_strategy='future',
+            num_hidden=2,
+            eps=1e-8,
             ):
 
             # log_tqdm
@@ -72,6 +74,8 @@ class SACWorker(NVGPUWorker):
                 use_her=use_her,
                 n_sampled_goal=n_sampled_goal,
                 goal_selection_strategy=goal_selection_strategy,
+                num_hidden=num_hidden,
+                eps=eps,
                 log_basedir=SACWorker.log_basedir,
             )
 
