@@ -22,6 +22,7 @@ class ValueNetwork(nn.Module):
 
         self.input_layer = nn.Linear(num_inputs, hidden_dim)
         self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
         self.output_layer = nn.Linear(hidden_dim, 1)
 
         self.apply(weights_init_)
@@ -41,11 +42,13 @@ class QNetwork(nn.Module):
         # Q1 architecture
         self.q1_input_layer = nn.Linear(num_inputs + num_actions, hidden_dim)
         self.q1_hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.q1_hidden_layers = nn.ModuleList(self.q1_hidden_layers)
         self.q1_output_layer = nn.Linear(hidden_dim, 1)
 
         # Q2 architecture
         self.q2_input_layer = nn.Linear(num_inputs + num_actions, hidden_dim)
         self.q2_hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.q2_hidden_layers = nn.ModuleList(self.q2_hidden_layers)
         self.q2_output_layer = nn.Linear(hidden_dim, 1)
 
         self.apply(weights_init_)
@@ -72,6 +75,7 @@ class BetaPolicy(nn.Module):
         
         self.input_layer = nn.Linear(num_inputs, hidden_dim)
         self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
 
         self.log_alpha_layer = nn.Linear(hidden_dim, num_actions)
         self.log_beta_layer = nn.Linear(hidden_dim, num_actions)
@@ -121,6 +125,7 @@ class GaussianPolicy(nn.Module):
         
         self.input_layer = nn.Linear(num_inputs, hidden_dim)
         self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
 
         self.mean_layer = nn.Linear(hidden_dim, num_actions)
         self.log_std_layer = nn.Linear(hidden_dim, num_actions)
@@ -171,6 +176,7 @@ class DeterministicPolicy(nn.Module):
         super(DeterministicPolicy, self).__init__()
         self.input_layer = nn.Linear(num_inputs, hidden_dim)
         self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
 
         self.mean_layer = nn.Linear(hidden_dim, num_actions)
         self.noise = torch.Tensor(num_actions)
