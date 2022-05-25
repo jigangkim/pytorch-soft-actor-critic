@@ -15,8 +15,8 @@ class FetchPickAndPlaceEnv(FetchPickAndPlaceEnv_gym):
         self.goal_dist = goal_dist
         super(FetchPickAndPlaceEnv, self).__init__(*args, **kwargs)
 
-    def compute_reward(self, achieved_goal, goal, info):
-        return super(FetchPickAndPlaceEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    # def compute_reward(self, achieved_goal, goal, info):
+    #     return super(FetchPickAndPlaceEnv, self).compute_reward(achieved_goal, goal, info) + 1
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -58,8 +58,8 @@ class FetchPushEnv(FetchPushEnv_gym):
         self.goal_dist = goal_dist
         super(FetchPushEnv, self).__init__(*args, **kwargs)
 
-    def compute_reward(self, achieved_goal, goal, info):
-        return super(FetchPushEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    # def compute_reward(self, achieved_goal, goal, info):
+    #     return super(FetchPushEnv, self).compute_reward(achieved_goal, goal, info) + 1
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -97,8 +97,8 @@ class FetchReachEnv(FetchReachEnv_gym):
         self.goal_dist = goal_dist
         super(FetchReachEnv, self).__init__(*args, **kwargs)
 
-    def compute_reward(self, achieved_goal, goal, info):
-        return super(FetchReachEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    # def compute_reward(self, achieved_goal, goal, info):
+    #     return super(FetchReachEnv, self).compute_reward(achieved_goal, goal, info) + 1
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -131,8 +131,8 @@ class FetchSlideEnv(FetchSlideEnv_gym):
         self.goal_dist = goal_dist
         super(FetchSlideEnv, self).__init__(*args, **kwargs)
 
-    def compute_reward(self, achieved_goal, goal, info):
-        return super(FetchSlideEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    # def compute_reward(self, achieved_goal, goal, info):
+    #     return super(FetchSlideEnv, self).compute_reward(achieved_goal, goal, info) + 1
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
