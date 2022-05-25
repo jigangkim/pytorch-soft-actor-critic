@@ -17,61 +17,64 @@ def weights_init_(m):
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, num_inputs, hidden_dim):
+    def __init__(self, num_inputs, hidden_dim, num_hidden=2):
         super(ValueNetwork, self).__init__()
 
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
+        self.input_layer = nn.Linear(num_inputs, hidden_dim)
+        self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.output_layer = nn.Linear(hidden_dim, 1)
 
         self.apply(weights_init_)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        x = self.linear3(x)
+        x = F.relu(self.input_layer(state))
+        for layer in self.hidden_layers:
+            x = F.relu(layer(x))
+        x = self.output_layer(x)
         return x
 
 
 class QNetwork(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim):
+    def __init__(self, num_inputs, num_actions, hidden_dim, num_hidden=2):
         super(QNetwork, self).__init__()
 
         # Q1 architecture
-        self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
+        self.q1_input_layer = nn.Linear(num_inputs + num_actions, hidden_dim)
+        self.q1_hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.q1_output_layer = nn.Linear(hidden_dim, 1)
 
         # Q2 architecture
-        self.linear4 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear5 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear6 = nn.Linear(hidden_dim, 1)
+        self.q2_input_layer = nn.Linear(num_inputs + num_actions, hidden_dim)
+        self.q2_hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
+        self.q2_output_layer = nn.Linear(hidden_dim, 1)
 
         self.apply(weights_init_)
 
     def forward(self, state, action):
         xu = torch.cat([state, action], 1)
         
-        x1 = F.relu(self.linear1(xu))
-        x1 = F.relu(self.linear2(x1))
-        x1 = self.linear3(x1)
+        x1 = F.relu(self.q1_input_layer(xu))
+        for layer in self.q1_hidden_layers:
+            x1 = F.relu(layer(x1))
+        x1 = self.q1_output_layer(x1)
 
-        x2 = F.relu(self.linear4(xu))
-        x2 = F.relu(self.linear5(x2))
-        x2 = self.linear6(x2)
+        x2 = F.relu(self.q2_input_layer(xu))
+        for layer in self.q2_hidden_layers:
+            x2 = F.relu(layer(x2))
+        x2 = self.q2_output_layer(x2)
 
         return x1, x2
 
 
 class BetaPolicy(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
+    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None, num_hidden=2):
         super(BetaPolicy, self).__init__()
         
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.input_layer = nn.Linear(num_inputs, hidden_dim)
+        self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
 
-        self.log_alpha_linear = nn.Linear(hidden_dim, num_actions)
-        self.log_beta_linear = nn.Linear(hidden_dim, num_actions)
+        self.log_alpha_layer = nn.Linear(hidden_dim, num_actions)
+        self.log_beta_layer = nn.Linear(hidden_dim, num_actions)
 
         self.apply(weights_init_)
 
@@ -85,10 +88,11 @@ class BetaPolicy(nn.Module):
             self.action_bias = torch.FloatTensor(action_space.low)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        log_alpha = self.log_alpha_linear(x)
-        log_beta = self.log_beta_linear(x)
+        x = F.relu(self.input_layer(state))
+        for layer in self.hidden_layers:
+            x = F.relu(layer(x))
+        log_alpha = self.log_alpha_layer(x)
+        log_beta = self.log_beta_layer(x)
         log_alpha = torch.clamp(log_alpha, min=LOG_ALPHABETA_MIN, max=LOG_ALPHABETA_MAX)
         log_beta = torch.clamp(log_beta, min=LOG_ALPHABETA_MIN, max=LOG_ALPHABETA_MAX)
         return log_alpha, log_beta
@@ -112,14 +116,14 @@ class BetaPolicy(nn.Module):
         
 
 class GaussianPolicy(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
+    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None, num_hidden=2):
         super(GaussianPolicy, self).__init__()
         
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.input_layer = nn.Linear(num_inputs, hidden_dim)
+        self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
 
-        self.mean_linear = nn.Linear(hidden_dim, num_actions)
-        self.log_std_linear = nn.Linear(hidden_dim, num_actions)
+        self.mean_layer = nn.Linear(hidden_dim, num_actions)
+        self.log_std_layer = nn.Linear(hidden_dim, num_actions)
 
         self.apply(weights_init_)
 
@@ -134,10 +138,11 @@ class GaussianPolicy(nn.Module):
                 (action_space.high + action_space.low) / 2.)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        mean = self.mean_linear(x)
-        log_std = self.log_std_linear(x)
+        x = F.relu(self.input_layer(state))
+        for layer in self.hidden_layers:
+            x = F.relu(layer(x))
+        mean = self.mean_layer(x)
+        log_std = self.log_std_layer(x)
         log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
         return mean, log_std
 
@@ -162,12 +167,12 @@ class GaussianPolicy(nn.Module):
 
 
 class DeterministicPolicy(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
+    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None, num_hidden=2):
         super(DeterministicPolicy, self).__init__()
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.input_layer = nn.Linear(num_inputs, hidden_dim)
+        self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(num_hidden-1)]
 
-        self.mean = nn.Linear(hidden_dim, num_actions)
+        self.mean_layer = nn.Linear(hidden_dim, num_actions)
         self.noise = torch.Tensor(num_actions)
 
         self.apply(weights_init_)
@@ -183,9 +188,10 @@ class DeterministicPolicy(nn.Module):
                 (action_space.high + action_space.low) / 2.)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        mean = torch.tanh(self.mean(x)) * self.action_scale + self.action_bias
+        x = F.relu(self.input_layer(state))
+        for layer in self.hidden_layers:
+            x = F.relu(layer(x))
+        mean = torch.tanh(self.mean_layer(x)) * self.action_scale + self.action_bias
         return mean
 
     def sample(self, state):
