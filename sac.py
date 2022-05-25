@@ -19,7 +19,8 @@ class SAC(object):
         hidden_size,
         target_update_interval,
         cuda,
-        use_value_function
+        use_value_function,
+        eps=1e-8,
         ):
 
         self.gamma = gamma
@@ -31,16 +32,18 @@ class SAC(object):
         self.automatic_entropy_tuning = automatic_entropy_tuning
 
         self.device = torch.device("cuda" if cuda else "cpu")
+        if not torch.cuda.is_available():
+            self.device = "cpu"
 
         self.use_value_function = use_value_function
 
         self.critic = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(device=self.device)
-        self.critic_optim = Adam(self.critic.parameters(), lr=lr)
+        self.critic_optim = Adam(self.critic.parameters(), lr=lr, eps=eps)
 
         if self.use_value_function:
             self.value = ValueNetwork(num_inputs, hidden_size).to(self.device)
             self.value_target = ValueNetwork(num_inputs, hidden_size).to(self.device)
-            self.value_optim = Adam(self.value.parameters(), lr=lr)
+            self.value_optim = Adam(self.value.parameters(), lr=lr, eps=eps)
             hard_update(self.value_target, self.value)
         else:
             self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
@@ -51,26 +54,26 @@ class SAC(object):
             if self.automatic_entropy_tuning is True:
                 self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-                self.alpha_optim = Adam([self.log_alpha], lr=lr)
+                self.alpha_optim = Adam([self.log_alpha], lr=lr, eps=eps)
 
             self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
-            self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+            self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         elif self.policy_type == "Deterministic":
             self.alpha = 0
             self.automatic_entropy_tuning = False
             self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
-            self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+            self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         elif self.policy_type == "Beta":
             # Target Entropy = −dim(A) (e.g. , -6 for HalfCheetah-v2) as given in the paper
             if self.automatic_entropy_tuning is True:
                 self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-                self.alpha_optim = Adam([self.log_alpha], lr=lr)
+                self.alpha_optim = Adam([self.log_alpha], lr=lr, eps=eps)
 
             self.policy = BetaPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
-            self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+            self.policy_optim = Adam(self.policy.parameters(), lr=lr, eps=eps)
 
         else:
             raise ValueError('Invalid policy type %s'%(self.policy_type))
