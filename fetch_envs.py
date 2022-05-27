@@ -11,12 +11,16 @@ from gym.envs.robotics.fetch.slide import FetchSlideEnv as FetchSlideEnv_gym
 
 
 class FetchPickAndPlaceEnv(FetchPickAndPlaceEnv_gym):
-    def __init__(self, *args, goal_dist='uniform', **kwargs):
+    def __init__(self, *args, goal_dist='uniform', reward_type='sparse', **kwargs):
         self.goal_dist = goal_dist
-        super(FetchPickAndPlaceEnv, self).__init__(*args, **kwargs)
+        self.reward_type_custom = reward_type
+        if 'sparse' in reward_type:
+            super(FetchPickAndPlaceEnv, self).__init__(*args, reward_type='sparse', **kwargs)
+        else:
+            super(FetchPickAndPlaceEnv, self).__init__(*args, reward_type=reward_type, **kwargs)
 
-    # def compute_reward(self, achieved_goal, goal, info):
-    #     return super(FetchPickAndPlaceEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    def compute_reward(self, achieved_goal, goal, info):
+            return super(FetchPickAndPlaceEnv, self).compute_reward(achieved_goal, goal, info) + (1 if self.reward_type_custom == 'sparse_positive' else 0)
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -54,12 +58,16 @@ class FetchPickAndPlaceEnv(FetchPickAndPlaceEnv_gym):
 
 
 class FetchPushEnv(FetchPushEnv_gym):
-    def __init__(self, *args, goal_dist='uniform', **kwargs):
+    def __init__(self, *args, goal_dist='uniform', reward_type='sparse', **kwargs):
         self.goal_dist = goal_dist
-        super(FetchPushEnv, self).__init__(*args, **kwargs)
+        self.reward_type_custom = reward_type
+        if 'sparse' in reward_type:
+            super(FetchPushEnv, self).__init__(*args, reward_type='sparse', **kwargs)
+        else:
+            super(FetchPushEnv, self).__init__(*args, reward_type=reward_type, **kwargs)
 
-    # def compute_reward(self, achieved_goal, goal, info):
-    #     return super(FetchPushEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    def compute_reward(self, achieved_goal, goal, info):
+        return super(FetchPushEnv, self).compute_reward(achieved_goal, goal, info) + (1 if self.reward_type_custom == 'sparse_positive' else 0)
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -93,12 +101,16 @@ class FetchPushEnv(FetchPushEnv_gym):
 
 
 class FetchReachEnv(FetchReachEnv_gym):
-    def __init__(self, *args, goal_dist='uniform', **kwargs):
+    def __init__(self, *args, goal_dist='uniform', reward_type='sparse', **kwargs):
         self.goal_dist = goal_dist
-        super(FetchReachEnv, self).__init__(*args, **kwargs)
+        self.reward_type_custom = reward_type
+        if 'sparse' in reward_type:
+            super(FetchReachEnv, self).__init__(*args, reward_type='sparse', **kwargs)
+        else:
+            super(FetchReachEnv, self).__init__(*args, reward_type=reward_type, **kwargs)
 
-    # def compute_reward(self, achieved_goal, goal, info):
-    #     return super(FetchReachEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    def compute_reward(self, achieved_goal, goal, info):
+        return super(FetchReachEnv, self).compute_reward(achieved_goal, goal, info) + (1 if self.reward_type_custom == 'sparse_positive' else 0)
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -127,12 +139,16 @@ class FetchReachEnv(FetchReachEnv_gym):
 
 
 class FetchSlideEnv(FetchSlideEnv_gym):
-    def __init__(self, *args, goal_dist='uniform', **kwargs):
+    def __init__(self, *args, goal_dist='uniform', reward_type='sparse', **kwargs):
         self.goal_dist = goal_dist
-        super(FetchSlideEnv, self).__init__(*args, **kwargs)
+        self.reward_type_custom = reward_type
+        if 'sparse' in reward_type:
+            super(FetchSlideEnv, self).__init__(*args, reward_type='sparse', **kwargs)
+        else:
+            super(FetchSlideEnv, self).__init__(*args, reward_type=reward_type, **kwargs)
 
-    # def compute_reward(self, achieved_goal, goal, info):
-    #     return super(FetchSlideEnv, self).compute_reward(achieved_goal, goal, info) + 1
+    def compute_reward(self, achieved_goal, goal, info):
+        return super(FetchSlideEnv, self).compute_reward(achieved_goal, goal, info) + (1 if self.reward_type_custom == 'sparse_positive' else 0)
 
     def _sample_goal(self):
         if self.goal_dist == 'uniform':
@@ -191,8 +207,13 @@ class NonGoalEnvWrapper(ObservationWrapper):
         }
 
 
-for reward_type, goal_dist in list(itertools.product(["sparse", "dense"], ["uniform", "compact", "single"])):
-    suffix1 = "Dense" if reward_type == "dense" else ""
+for reward_type, goal_dist in list(itertools.product(["sparse", "dense", "sparse_positive"], ["uniform", "compact", "single"])):
+    if reward_type == "dense":
+        suffix1 = "Dense"
+    elif reward_type == "sparse_positive":
+        suffix1 = "SparsePositive"
+    else:
+        suffix1 = ""
     if goal_dist == "compact":
         suffix2 = "Compact"
     elif goal_dist == "single":
@@ -242,3 +263,11 @@ if __name__ == '__main__':
     env = gym.make('FetchReachSingle-v2')
     env = gym.make('FetchSlideCompact-v2')
     env = gym.make('FetchSlideSingle-v2')
+    env = gym.make('FetchPickAndPlaceDense-v2')
+    env = gym.make('FetchPickAndPlaceSparsePositive-v2')
+    env = gym.make('FetchPushDense-v2')
+    env = gym.make('FetchPushSparsePositive-v2')
+    env = gym.make('FetchReachDense-v2')
+    env = gym.make('FetchReachSparsePositive-v2')
+    env = gym.make('FetchSlideDense-v2')
+    env = gym.make('FetchSlideSparsePositive-v2')
